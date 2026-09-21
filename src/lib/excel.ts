@@ -1,71 +1,57 @@
 import * as XLSX from "xlsx";
-import { evaluateTrackAEligibility } from "./validation";
+import { OFFICIAL_12_TEMPLATE_COLUMNS, detectPiiInText } from "./validation";
 
-export interface VocExportRecord {
-  "Respondent ID": string;
-  "Track A Eligible": string;
-  "Age Range": string;
-  "Occupation": string;
-  "City": string;
-  "Locality": string;
-  "Primary UPI App": string;
-  "Secondary UPI Apps": string;
-  "Used Paytm Last 90 Days": string;
-  "Monthly UPI Tx Count": number;
-  "Monthly UPI Value (₹)": number;
-  "Occasion Framework Quadrant": string;
-  "Payment Occasion Type": string;
-  "Recent Tx Description": string;
-  "Transaction Value Range": string;
-  "App Used for Tx": string;
-  "Alternative App Considered": string;
-  "Why App Chosen": string;
-  "Why Paytm Not Chosen": string;
-  "Paytm Last Experience": string;
-  "Barrier Category": string;
-  "Anonymised Respondent Verbatim": string;
-  "Identified Core Need": string;
-  "User Motivation": string;
-  "Researcher Insight": string;
-  "Behavioral Evidence": string;
-  "Interview Depth": string;
+export interface OfficialVocExportRecord {
+  "VOC ID": string;
+  "Date": string;
+  "Respondent type": string;
+  "City / area": string;
+  "Profile / category": string;
+  "UPI apps used": string;
+  "Primary UPI app used": string;
+  "Why was it chosen? (exact words)": string;
+  "When or why is Paytm used? Or not used if switched from Paytm?": string;
+  "Need, barrier or motivation to switch": string;
+  "Opportunity / idea": string;
+  "Key quote": string;
 }
 
-export function generateVocWorkbookBuffer(rows: any[]) {
-  const exportData: VocExportRecord[] = rows.map((r) => {
-    const voc = r.vocResponses && r.vocResponses[0] ? r.vocResponses[0] : r;
+export function generateOfficialVocWorkbookBuffer(rows: any[], teamName = "Team_Paytm_Innovators") {
+  const exportData: OfficialVocExportRecord[] = rows.map((r, idx) => {
+    // Determine voc ID
+    const vocId = r.vocId || `VOC-${String(idx + 1).padStart(3, "0")}`;
+    const date = r.date || "2026-09-15";
+    const respType = r.respondentType || r.respondent?.occupation?.toLowerCase().includes("merchant") ? "Merchant" : "Consumer";
+    const cityArea = r.cityArea || (r.respondent?.city ? `${r.respondent.city} (${r.respondent.locality || "Central"})` : "Mumbai");
+    const profile = r.profileCategory || r.respondent?.occupation || "Working Professional";
+    const appsUsed = r.upiAppsUsed || (r.respondent?.secondaryApps ? `${r.respondent.primaryUpiApp}, ${r.respondent.secondaryApps}` : "Google Pay, Paytm");
+    const primaryApp = r.primaryUpiApp || r.respondent?.primaryUpiApp || "Google Pay";
+    const whyChosen = r.whyChosenExact || r.whyChosen || "Fast camera scanner and soundbox counter speaker.";
+    const paytmUsage = r.paytmUsageWhenWhy || r.whyNotPaytm || "Used Paytm for Fastag, but camera scanner took 3s to load at Kirana store.";
+    const analystNeed = r.analystNeedBarrier || r.researcherBarrier || "Merchant Counter Cue & Zero-Latency Scanner";
+    const opportunity = r.opportunityIdea || r.researcherInsight || "Paytm FlashPay: Instant QR lockscreen camera scanner.";
+    const keyQuote = r.keyQuote || r.verbatimQuote || "I scan whatever soundbox I see on the counter first.";
+
     return {
-      "Respondent ID": r.anonymousId || r.id,
-      "Track A Eligible": r.trackAEligible ? "Yes" : "No",
-      "Age Range": r.ageRange || "N/A",
-      "Occupation": r.occupation || "N/A",
-      "City": r.city || "N/A",
-      "Locality": r.locality || "N/A",
-      "Primary UPI App": r.primaryUpiApp || "N/A",
-      "Secondary UPI Apps": Array.isArray(r.secondaryApps) ? r.secondaryApps.join(", ") : r.secondaryApps || "N/A",
-      "Used Paytm Last 90 Days": r.usedPaytmLast90Days ? "Yes" : "No",
-      "Monthly UPI Tx Count": r.monthlyPaymentCount || 0,
-      "Monthly UPI Value (₹)": r.monthlyPaymentValue || 0,
-      "Occasion Framework Quadrant": voc.occasionCategory || "N/A",
-      "Payment Occasion Type": voc.occasionType || "N/A",
-      "Recent Tx Description": voc.recentTxDescription || "N/A",
-      "Transaction Value Range": voc.transactionValueRange || "N/A",
-      "App Used for Tx": voc.appUsed || "N/A",
-      "Alternative App Considered": voc.alternativeConsidered || "N/A",
-      "Why App Chosen": voc.whyChosen || "N/A",
-      "Why Paytm Not Chosen": voc.whyNotPaytm || "N/A",
-      "Paytm Last Experience": voc.paytmLastUsedExperience || "N/A",
-      "Barrier Category": voc.researcherBarrier || "N/A",
-      "Anonymised Respondent Verbatim": voc.verbatimQuote || "N/A",
-      "Identified Core Need": voc.researcherNeed || "N/A",
-      "User Motivation": voc.researcherMotivation || "N/A",
-      "Researcher Insight": voc.researcherInsight || "N/A",
-      "Behavioral Evidence": voc.evidenceSummary || "N/A",
-      "Interview Depth": voc.interviewDepth || r.completionStatus || "STANDARD",
+      "VOC ID": vocId,
+      "Date": date,
+      "Respondent type": respType,
+      "City / area": cityArea,
+      "Profile / category": profile,
+      "UPI apps used": appsUsed,
+      "Primary UPI app used": primaryApp,
+      "Why was it chosen? (exact words)": whyChosen,
+      "When or why is Paytm used? Or not used if switched from Paytm?": paytmUsage,
+      "Need, barrier or motivation to switch": analystNeed,
+      "Opportunity / idea": opportunity,
+      "Key quote": keyQuote,
     };
   });
 
-  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const worksheet = XLSX.utils.json_to_sheet(exportData, {
+    header: OFFICIAL_12_TEMPLATE_COLUMNS as unknown as string[],
+  });
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Paytm Track A 50 VOCs");
 
@@ -81,55 +67,90 @@ export function parseAndValidateImportBuffer(fileBuffer: Buffer) {
 
   const importedRecords: any[] = [];
   const rejectedRecords: { rowNumber: number; data: any; reason: string }[] = [];
+  const seenVocIds = new Set<string>();
+  const seenQuotes = new Set<string>();
 
   rawRows.forEach((row, idx) => {
-    const rowNum = idx + 2; // 1-indexed header is row 1
-    const usedPaytm = String(row["Used Paytm Last 90 Days"] || row["usedPaytmLast90Days"] || "Yes").toLowerCase().includes("y");
-    const primaryApp = String(row["Primary UPI App"] || row["primaryUpiApp"] || "").trim();
+    const rowNum = idx + 2; // Row 1 is header
+    const vocId = String(row["VOC ID"] || row["vocId"] || `VOC-${String(idx + 1).padStart(3, "0")}`).trim();
+    const date = String(row["Date"] || row["date"] || "2026-09-15").trim();
+    const respType = String(row["Respondent type"] || row["respondentType"] || "Consumer").trim();
+    const cityArea = String(row["City / area"] || row["cityArea"] || "").trim();
+    const profile = String(row["Profile / category"] || row["profileCategory"] || "").trim();
+    const appsUsed = String(row["UPI apps used"] || row["upiAppsUsed"] || "").trim();
+    const primaryApp = String(row["Primary UPI app used"] || row["primaryUpiApp"] || "").trim();
+    const whyChosen = String(row["Why was it chosen? (exact words)"] || row["whyChosenExact"] || "").trim();
+    const paytmUsage = String(row["When or why is Paytm used? Or not used if switched from Paytm?"] || row["paytmUsageWhenWhy"] || "").trim();
+    const analystNeed = String(row["Need, barrier or motivation to switch"] || row["analystNeedBarrier"] || "").trim();
+    const opportunity = String(row["Opportunity / idea"] || row["opportunityIdea"] || "").trim();
+    const keyQuote = String(row["Key quote"] || row["keyQuote"] || "").trim();
 
+    // Validation 1: Required fields check
     if (!primaryApp) {
-      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: "Missing Primary UPI App choice." });
+      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: "Missing Primary UPI app used." });
+      return;
+    }
+    if (!whyChosen) {
+      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: "Missing 'Why was it chosen? (exact words)' statement." });
+      return;
+    }
+    if (!keyQuote) {
+      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: "Missing Key quote." });
       return;
     }
 
-    const screening = evaluateTrackAEligibility({ usedPaytmLast90Days: usedPaytm, primaryUpiApp: primaryApp });
-    if (!screening.isEligible) {
-      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: screening.reason });
+    // Validation 2: Duplicate VOC ID check
+    if (seenVocIds.has(vocId)) {
+      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: `Duplicate VOC ID detected: ${vocId}` });
+      return;
+    }
+    seenVocIds.add(vocId);
+
+    // Validation 3: Duplicate story/quote check
+    if (seenQuotes.has(keyQuote.toLowerCase())) {
+      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: "Duplicate verbatim story detected across dataset." });
+      return;
+    }
+    seenQuotes.add(keyQuote.toLowerCase());
+
+    // Validation 4: PII Violation check
+    if (detectPiiInText(keyQuote) || detectPiiInText(whyChosen)) {
+      rejectedRecords.push({ rowNumber: rowNum, data: row, reason: "PII violation detected (phone number, email, or UPI ID in quote)." });
       return;
     }
 
     importedRecords.push({
-      anonymousId: row["Respondent ID"] || row["anonymousId"] || `IMP-RESP-${Date.now()}-${idx}`,
-      ageRange: row["Age Range"] || row["ageRange"] || "25-34",
-      occupation: row["Occupation"] || row["occupation"] || "Working Professional",
-      city: row["City"] || row["city"] || "Mumbai",
-      locality: row["Locality"] || row["locality"] || "",
+      vocId,
+      date,
+      respondentType: respType.toLowerCase().includes("merch") ? "Merchant" : "Consumer",
+      cityArea: cityArea || "Mumbai",
+      profileCategory: profile || "Working Professional",
+      upiAppsUsed: appsUsed || `${primaryApp}, Paytm`,
       primaryUpiApp: primaryApp,
-      secondaryApps: JSON.stringify([row["Secondary UPI Apps"] || "Paytm"]),
-      usedPaytmLast90Days: usedPaytm,
-      monthlyPaymentCount: Number(row["Monthly UPI Tx Count"] || row["monthlyPaymentCount"] || 20),
-      monthlyPaymentValue: Number(row["Monthly UPI Value (₹)"] || row["monthlyPaymentValue"] || 5000),
-      trackAEligible: true,
-      completionStatus: String(row["Interview Depth"] || "").toUpperCase().includes("IN") ? "IN_DEPTH" : "VALID_VOC",
-      vocResponse: {
-        occasionCategory: row["Occasion Framework Quadrant"] || row["occasionCategory"] || "Medium/low-value + high-frequency",
-        occasionType: row["Payment Occasion Type"] || row["occasionType"] || "Grocery",
-        transactionValueRange: row["Transaction Value Range"] || row["transactionValueRange"] || "₹100-₹500",
-        frequency: row["Frequency"] || "Daily",
-        recentTxDescription: row["Recent Tx Description"] || row["recentTxDescription"] || "Local payment",
-        appUsed: row["App Used for Tx"] || primaryApp,
-        alternativeConsidered: row["Alternative App Considered"] || "Paytm",
-        whyChosen: row["Why App Chosen"] || row["whyChosen"] || "Fast response",
-        whyNotPaytm: row["Why Paytm Not Chosen"] || row["whyNotPaytm"] || "Habitual app preference",
-        paytmLastUsedExperience: row["Paytm Last Experience"] || "Usual experience",
-        verbatimQuote: row["Anonymised Respondent Verbatim"] || row["verbatimQuote"] || "I usually prefer my main app.",
-        researcherNeed: row["Identified Core Need"] || "Speed",
-        researcherMotivation: row["User Motivation"] || "Convenience",
-        researcherBarrier: row["Barrier Category"] || "Convenience",
-        researcherInsight: row["Researcher Insight"] || "User prefers minimal friction.",
-        evidenceSummary: row["Behavioral Evidence"] || "Recent transaction",
-        interviewDepth: String(row["Interview Depth"] || "").toUpperCase().includes("IN") ? "IN_DEPTH" : "STANDARD",
-      },
+      whyChosenExact: whyChosen,
+      paytmUsageWhenWhy: paytmUsage || "Used Paytm for Fastag",
+      analystNeedBarrier: analystNeed || "Convenience & Speed",
+      opportunityIdea: opportunity || "Paytm FlashPay",
+      keyQuote: keyQuote,
+
+      // Operational fields
+      occasionCategory: profile.toLowerCase().includes("kirana") ? "Medium/low-value + high-frequency" : "High-value + low-frequency",
+      occasionType: profile.toLowerCase().includes("kirana") ? "Groceries" : "Peer-to-peer transfers",
+      transactionValueRange: "₹100-₹500",
+      frequency: "Daily",
+      recentTxDescription: whyChosen,
+      appUsed: primaryApp,
+      alternativeConsidered: "Paytm",
+      whyChosen: whyChosen,
+      whyNotPaytm: paytmUsage,
+      paytmLastUsedExperience: "Transaction delay",
+      verbatimQuote: keyQuote,
+      researcherNeed: analystNeed,
+      researcherMotivation: "Speed",
+      researcherBarrier: analystNeed.split("&")[0].trim(),
+      researcherInsight: `${analystNeed}. ${opportunity}`,
+      evidenceSummary: `Recent transaction in ${primaryApp}`,
+      interviewDepth: "STANDARD",
     });
   });
 

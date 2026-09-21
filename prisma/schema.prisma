@@ -11,10 +11,10 @@ model Respondent {
   id                   String        @id @default(cuid())
   anonymousId          String        @unique
   ageRange             String        // 18-24, 25-34, 35-44, 45+
-  occupation           String        // Student, Working Professional, Business Owner, Freelancer, Other
+  occupation           String        // Student, Working Professional, Business Owner, Freelancer, Kirana Merchant, Other
   city                 String
   locality             String?
-  primaryUpiApp        String        // Paytm, Google Pay, PhonePe, BHIM, Bank UPI app, Other
+  primaryUpiApp        String        // Paytm, Google Pay, PhonePe, BHIM, Amazon Pay, Bank UPI app, Other
   secondaryApps        String        // JSON array string
   usedPaytmLast90Days  Boolean       // Screener Q1
   monthlyPaymentCount  Int
@@ -33,25 +33,41 @@ model Respondent {
 
 model VocResponse {
   id                      String      @id @default(cuid())
-  respondentId            String
-  respondent              Respondent  @relation(fields: [respondentId], references: [id], onDelete: Cascade)
-  occasionCategory        String      // High-value + high-frequency, High-value + low-frequency, Medium/low-value + high-frequency, Other
-  occasionType            String      // Grocery, Food, Shopping, Transport, Bills, Rent, Education, Healthcare, Travel, Online purchases, P2P transfers, Merchant payments, Recharge, Other
-  transactionValueRange   String      // <₹100, ₹100-₹500, ₹500-₹2000, ₹2000-₹10000, >₹10000
-  frequency               String      // Daily, Weekly, Monthly, Occasional
-  recentTxDescription     String
-  appUsed                 String      // App actually used for this transaction
-  alternativeConsidered   String?     // Alternative considered
-  whyChosen               String      // Reason chosen
-  whyNotPaytm             String      // Why Paytm was not used / considered
-  paytmLastUsedExperience String      // What happened last time Paytm was used
-  verbatimQuote           String      // Anonymised exact quote
-  researcherNeed          String      // Identified core need
-  researcherMotivation    String      // User motivation
-  researcherBarrier       String      // Core barrier identified
-  researcherInsight       String      // Key researcher insight
-  evidenceSummary         String      // Summary of behavioral evidence
-  interviewDepth          String      // STANDARD, IN_DEPTH
+  
+  // OFFICIAL 12 TEMPLATE COLUMNS
+  vocId                   String      @default("VOC-001") // Col 1: VOC ID (VOC-001 to VOC-050)
+  date                    String      @default("2026-09-15") // Col 2: Date (YYYY-MM-DD)
+  respondentType          String      @default("Consumer") // Col 3: Respondent type (Consumer / Merchant)
+  cityArea                String      @default("Mumbai") // Col 4: City / area
+  profileCategory         String      @default("Working Professional") // Col 5: Profile / category
+  upiAppsUsed             String      @default("Google Pay, Paytm") // Col 6: UPI apps used
+  primaryUpiApp           String      @default("Google Pay") // Col 7: Primary UPI app used
+  whyChosenExact          String      @default("") // Col 8: Why was it chosen? (exact words)
+  paytmUsageWhenWhy       String      @default("") // Col 9: When or why is Paytm used? Or not used if switched from Paytm?
+  analystNeedBarrier      String      @default("") // Col 10: Need, barrier or motivation to switch (Analyst Derived)
+  opportunityIdea         String      @default("") // Col 11: Opportunity / idea
+  keyQuote                String      @default("") // Col 12: Key quote
+
+  // Extended Research Properties
+  respondentId            String?
+  respondent              Respondent?  @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  occasionCategory        String      @default("Medium/low-value + high-frequency")
+  occasionType            String      @default("Grocery")
+  transactionValueRange   String      @default("₹100-₹500")
+  frequency               String      @default("Daily")
+  recentTxDescription     String      @default("")
+  appUsed                 String      @default("Google Pay")
+  alternativeConsidered   String?     @default("Paytm")
+  whyChosen               String      @default("")
+  whyNotPaytm             String      @default("")
+  paytmLastUsedExperience String      @default("")
+  verbatimQuote           String      @default("")
+  researcherNeed          String      @default("")
+  researcherMotivation    String      @default("")
+  researcherBarrier       String      @default("")
+  researcherInsight       String      @default("")
+  evidenceSummary         String      @default("")
+  interviewDepth          String      @default("STANDARD") // STANDARD or IN_DEPTH
   isDemo                  Boolean     @default(false)
   createdAt               DateTime    @default(now())
   updatedAt               DateTime    @updatedAt
@@ -76,8 +92,8 @@ model Barrier {
   id            String       @id @default(cuid())
   category      String       // Convenience, Reliability, Speed, Habit, Trust, Rewards/value, Merchant acceptance/cues, Feature awareness, User interface, Transaction history/records, Social influence, Other
   description   String
-  respondentId  String
-  respondent    Respondent   @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  respondentId  String?
+  respondent    Respondent?  @relation(fields: [respondentId], references: [id], onDelete: Cascade)
   vocId         String?
   voc           VocResponse? @relation(fields: [vocId], references: [id], onDelete: Cascade)
   isDemo        Boolean      @default(false)
@@ -138,8 +154,8 @@ model SolutionValidation {
   id                     String          @id @default(cuid())
   solutionId             String
   solution               SolutionConcept @relation(fields: [solutionId], references: [id], onDelete: Cascade)
-  respondentId           String
-  respondent             Respondent      @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  respondentId           String?
+  respondent             Respondent?     @relation(fields: [respondentId], references: [id], onDelete: Cascade)
   solvesProblem          Boolean
   wouldChangeApp         Boolean
   targetOccasion         String
@@ -155,6 +171,7 @@ model ResearchMetadata {
   id                  String   @id @default("default")
   totalVocTarget      Int      @default(50)
   inDepthTarget       Int      @default(10)
+  teamName            String   @default("Team_Paytm_Innovators")
   activeMode          String   @default("REAL") // REAL or DEMO
   lastAuditTimestamp  DateTime @default(now())
 }

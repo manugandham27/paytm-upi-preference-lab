@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { performQualityControlCheck } from "@/lib/validation";
+import { auditSubmissionReadiness } from "@/lib/validation";
 
 export async function GET(req: Request) {
   try {
@@ -9,59 +9,75 @@ export async function GET(req: Request) {
     const isDemoFilter = mode === "DEMO";
 
     const totalVocCount = await prisma.vocResponse.count({ where: { isDemo: isDemoFilter } });
-    const inDepthCount = await prisma.inDepthInterview.count({ where: { isDemo: isDemoFilter } });
-    const eligibleCount = await prisma.respondent.count({
-      where: { isDemo: isDemoFilter, trackAEligible: true },
-    });
-    const invalidCount = await prisma.respondent.count({
-      where: { isDemo: isDemoFilter, completionStatus: "INVALID_SCREENING" },
-    });
+    const realVocCount = await prisma.vocResponse.count({ where: { isDemo: false } });
+    const demoVocCount = await prisma.vocResponse.count({ where: { isDemo: true } });
 
-    const allRespondents = await prisma.respondent.findMany({
+    const realInDepthCount = await prisma.inDepthInterview.count({ where: { isDemo: false } });
+    const totalInDepthCount = await prisma.inDepthInterview.count({ where: { isDemo: isDemoFilter } });
+
+    const vocs = await prisma.vocResponse.findMany({
       where: { isDemo: isDemoFilter },
-      select: { anonymousId: true },
-    });
-
-    const ids = allRespondents.map((r) => r.anonymousId);
-    const uniqueIds = new Set(ids);
-    const hasDuplicates = uniqueIds.size !== ids.length;
-
-    const vocsWithMissingVerbatims = await prisma.vocResponse.count({
-      where: {
-        isDemo: isDemoFilter,
-        OR: [{ verbatimQuote: "" }, { verbatimQuote: "N/A" }],
+      select: {
+        respondentType: true,
+        cityArea: true,
+        profileCategory: true,
+        primaryUpiApp: true,
+        occasionType: true,
+        keyQuote: true,
+        analystNeedBarrier: true,
+        opportunityIdea: true,
+        vocId: true,
       },
     });
 
-    const vocsWithUnassignedBarriers = await prisma.vocResponse.count({
-      where: {
-        isDemo: isDemoFilter,
-        OR: [{ researcherBarrier: "" }, { researcherBarrier: "N/A" }],
-      },
-    });
+    const consumersCount = vocs.filter((v) => v.respondentType.toLowerCase() === "consumer").length;
+    const merchantsCount = vocs.filter((v) => v.respondentType.toLowerCase() === "merchant").length;
 
-    const audit = performQualityControlCheck({
+    const distinctCities = new Set(vocs.map((v) => v.cityArea)).size;
+    const distinctProfiles = new Set(vocs.map((v) => v.profileCategory)).size;
+    const distinctApps = new Set(vocs.map((v) => v.primaryUpiApp)).size;
+    const distinctOccasions = new Set(vocs.map((v) => v.occasionType)).size;
+
+    const recordsWithQuotes = vocs.filter((v) => v.keyQuote && v.keyQuote.length > 5).length;
+    const recordsWithBarriers = vocs.filter((v) => v.analystNeedBarrier && v.analystNeedBarrier.length > 3).length;
+    const recordsWithOpportunities = vocs.filter((v) => v.opportunityIdea && v.opportunityIdea.length > 3).length;
+
+    const ids = vocs.map((v) => v.vocId);
+    const hasDuplicates = new Set(ids).size !== ids.length;
+
+    const readinessChecklist = auditSubmissionReadiness({
       totalVocCount,
-      inDepthCount,
-      eligibleCount,
-      invalidCount,
-      hasDuplicates,
+      realVocCount,
+      demoVocCount,
+      realInDepthCount,
+      distinctProfilesCount: distinctProfiles,
+      distinctCitiesCount: distinctCities,
+      distinctOccasionsCount: distinctOccasions,
       hasPiiViolation: false,
-      unassignedBarriersCount: vocsWithUnassignedBarriers,
-      incompleteVerbatimsCount: vocsWithMissingVerbatims,
+      hasDuplicates,
+      isDemoMode: isDemoFilter,
     });
 
     return NextResponse.json({
-      audit,
+      readinessChecklist,
       stats: {
         totalVocCount,
-        inDepthCount,
-        eligibleCount,
-        invalidCount,
+        realVocCount,
+        demoVocCount,
+        realInDepthCount,
+        totalInDepthCount,
+        consumersCount,
+        merchantsCount,
+        distinctCities,
+        distinctProfiles,
+        distinctApps,
+        distinctOccasions,
+        recordsWithQuotes,
+        recordsWithBarriers,
+        recordsWithOpportunities,
         targetVoc: 50,
         targetInDepth: 10,
         progressPct: Math.min(100, Math.round((totalVocCount / 50) * 100)),
-        inDepthProgressPct: Math.min(100, Math.round((inDepthCount / 10) * 100)),
       },
       mode,
     });

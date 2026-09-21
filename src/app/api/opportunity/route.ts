@@ -20,11 +20,11 @@ export async function GET(req: Request) {
 
     const totalSample = vocs.length;
     const avgMonthlyTxCount = totalSample > 0
-      ? vocs.reduce((acc, v) => acc + (v.respondent.monthlyPaymentCount || 15), 0) / totalSample
+      ? vocs.reduce((acc, v) => acc + (v.respondent?.monthlyPaymentCount || 15), 0) / totalSample
       : 18.5;
 
     const avgMonthlyValue = totalSample > 0
-      ? vocs.reduce((acc, v) => acc + (v.respondent.monthlyPaymentValue || 4500), 0) / totalSample
+      ? vocs.reduce((acc, v) => acc + (v.respondent?.monthlyPaymentValue || 4500), 0) / totalSample
       : 8325;
 
     const avgTicketSize = avgMonthlyTxCount > 0 ? avgMonthlyValue / avgMonthlyTxCount : 450;
