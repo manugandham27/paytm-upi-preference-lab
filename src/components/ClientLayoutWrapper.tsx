@@ -6,7 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { DemoBanner } from "./DemoBanner";
 
 export function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
-  const [currentMode, setCurrentMode] = useState<string>("REAL");
+  const [currentMode, setCurrentMode] = useState<string>("DEMO");
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {

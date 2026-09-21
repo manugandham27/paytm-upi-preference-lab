@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, ensureInitialData } from "@/lib/prisma";
 import { evaluateTrackAEligibility } from "@/lib/validation";
 
 export async function GET(req: Request) {
   try {
+    await ensureInitialData();
+
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get("mode") || "REAL";
     const isDemoFilter = mode === "DEMO";

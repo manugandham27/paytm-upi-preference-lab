@@ -9,3 +9,16 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+export async function ensureInitialData() {
+  try {
+    const count = await prisma.vocResponse.count();
+    if (count === 0) {
+      // Dynamic import to avoid circular dependency
+      const { seedDemoData } = await import("./demoData");
+      await seedDemoData();
+    }
+  } catch (e) {
+    console.error("Auto-seed on serverless error:", e);
+  }
+}

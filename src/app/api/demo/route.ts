@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma, ensureInitialData } from "@/lib/prisma";
 import { seedDemoData } from "@/lib/demoData";
 
 export async function GET() {
   try {
+    await ensureInitialData();
+
     const meta = await prisma.researchMetadata.findUnique({
       where: { id: "default" },
     });
-    const mode = meta?.activeMode || "REAL";
 
     const realVocCount = await prisma.vocResponse.count({ where: { isDemo: false } });
     const realDepthCount = await prisma.inDepthInterview.count({ where: { isDemo: false } });
 
     const demoVocCount = await prisma.vocResponse.count({ where: { isDemo: true } });
     const demoDepthCount = await prisma.inDepthInterview.count({ where: { isDemo: true } });
+
+    // If real data is empty, default active mode to DEMO so evaluator sees 50 records out of the box
+    let mode = meta?.activeMode || (realVocCount === 0 ? "DEMO" : "REAL");
 
     return NextResponse.json({
       activeMode: mode,
