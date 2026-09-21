@@ -1,0 +1,160 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Respondent {
+  id                   String        @id @default(cuid())
+  anonymousId          String        @unique
+  ageRange             String        // 18-24, 25-34, 35-44, 45+
+  occupation           String        // Student, Working Professional, Business Owner, Freelancer, Other
+  city                 String
+  locality             String?
+  primaryUpiApp        String        // Paytm, Google Pay, PhonePe, BHIM, Bank UPI app, Other
+  secondaryApps        String        // JSON array string
+  usedPaytmLast90Days  Boolean       // Screener Q1
+  monthlyPaymentCount  Int
+  monthlyPaymentValue  Float
+  trackAEligible       Boolean       // True if usedPaytmLast90Days === true AND primaryUpiApp !== 'Paytm'
+  completionStatus     String        // INCOMPLETE, VALID_VOC, IN_DEPTH, INVALID_SCREENING
+  isDemo               Boolean       @default(false)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  vocResponses         VocResponse[]
+  inDepthInterview     InDepthInterview?
+  solutionValidations  SolutionValidation[]
+  barriers             Barrier[]
+}
+
+model VocResponse {
+  id                      String      @id @default(cuid())
+  respondentId            String
+  respondent              Respondent  @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  occasionCategory        String      // High-value + high-frequency, High-value + low-frequency, Medium/low-value + high-frequency, Other
+  occasionType            String      // Grocery, Food, Shopping, Transport, Bills, Rent, Education, Healthcare, Travel, Online purchases, P2P transfers, Merchant payments, Recharge, Other
+  transactionValueRange   String      // <₹100, ₹100-₹500, ₹500-₹2000, ₹2000-₹10000, >₹10000
+  frequency               String      // Daily, Weekly, Monthly, Occasional
+  recentTxDescription     String
+  appUsed                 String      // App actually used for this transaction
+  alternativeConsidered   String?     // Alternative considered
+  whyChosen               String      // Reason chosen
+  whyNotPaytm             String      // Why Paytm was not used / considered
+  paytmLastUsedExperience String      // What happened last time Paytm was used
+  verbatimQuote           String      // Anonymised exact quote
+  researcherNeed          String      // Identified core need
+  researcherMotivation    String      // User motivation
+  researcherBarrier       String      // Core barrier identified
+  researcherInsight       String      // Key researcher insight
+  evidenceSummary         String      // Summary of behavioral evidence
+  interviewDepth          String      // STANDARD, IN_DEPTH
+  isDemo                  Boolean     @default(false)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+
+  barriers                Barrier[]
+}
+
+model InDepthInterview {
+  id                 String      @id @default(cuid())
+  respondentId       String      @unique
+  respondent         Respondent  @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  promptAnswersJson  String      // JSON string of 16-point answers
+  observations       String      // Researcher observations
+  keyQuotesJson      String      // JSON array of key verbatims
+  emergingInsights   String      // Emerging insights from interview
+  isDemo             Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model Barrier {
+  id            String       @id @default(cuid())
+  category      String       // Convenience, Reliability, Speed, Habit, Trust, Rewards/value, Merchant acceptance/cues, Feature awareness, User interface, Transaction history/records, Social influence, Other
+  description   String
+  respondentId  String
+  respondent    Respondent   @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  vocId         String?
+  voc           VocResponse? @relation(fields: [vocId], references: [id], onDelete: Cascade)
+  isDemo        Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+}
+
+model Insight {
+  id             String   @id @default(cuid())
+  title          String
+  observation    String   // What respondents actually did
+  evidenceCount  Int      // How many respondents showed this behavior
+  verbatimQuote  String   // Representative verbatim
+  pattern        String   // Common behavior pattern
+  barrier        String   // Barrier preventing Paytm usage
+  opportunity    String   // Where Paytm can intervene
+  implication    String   // Recommendation for product team
+  linkedVocIds   String   // JSON array of VOC IDs
+  isDemo         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model OpportunityModel {
+  id                     String   @id @default(cuid())
+  segmentName            String
+  targetUserCount        Int
+  avgMonthlyFreq         Float
+  avgTicketSize          Float
+  potentialShareShiftPct Float
+  calculatedGmvPotential Float
+  assumptionsJson        String   // JSON string of assumptions
+  isDemo                 Boolean  @default(false)
+  createdAt              DateTime @default(now())
+}
+
+model SolutionConcept {
+  id                        String               @id @default(cuid())
+  name                      String
+  problemAddressed          String
+  targetUser                String
+  relevantOccasion          String
+  vocEvidence               String
+  userBenefit               String
+  paytmBenefit              String
+  merchantBenefit           String?
+  expectedBehaviorChange    String
+  implementationRequirements String
+  potentialRisks            String
+  scalabilityScore          Int                  // 1 to 10
+  measurementMetric         String
+  isDemo                    Boolean              @default(false)
+  createdAt                 DateTime             @default(now())
+
+  validations               SolutionValidation[]
+}
+
+model SolutionValidation {
+  id                     String          @id @default(cuid())
+  solutionId             String
+  solution               SolutionConcept @relation(fields: [solutionId], references: [id], onDelete: Cascade)
+  respondentId           String
+  respondent             Respondent      @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  solvesProblem          Boolean
+  wouldChangeApp         Boolean
+  targetOccasion         String
+  expectedFrequency      String
+  perceivedBlockers      String
+  improvementSuggestions String
+  existingAlternative    String
+  isDemo                 Boolean         @default(false)
+  createdAt              DateTime        @default(now())
+}
+
+model ResearchMetadata {
+  id                  String   @id @default("default")
+  totalVocTarget      Int      @default(50)
+  inDepthTarget       Int      @default(10)
+  activeMode          String   @default("REAL") // REAL or DEMO
+  lastAuditTimestamp  DateTime @default(now())
+}
